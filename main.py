@@ -9,39 +9,42 @@ currentWorkingDirectory = os.getcwd()
 
 def main():
     print("Running Face Recognition")
-    knownDir = parseDir = outlierDir = ""
-    knownDir, parseDir, outlierDir = initialise()
-    
-    # Remove all faceless picture.
-    removeFaceless(parseDir, outlierDir)
+    knownPicDir = unknownPicDir = noFaceFoundDir = ""
+    knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir = initialise()
    
     # Find matching face
-    findMatchingFace(knownDir, parseDir)
+    findMatchingFace(knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir)
 
 
 def initialise():
     '''
     Make directory if not found.
     '''
-    knownDir = currentWorkingDirectory + "\\known_face"
+    knownPicDir = currentWorkingDirectory + "\\known_face"
     try:
-        os.makedirs(knownDir)
+        os.makedirs(knownPicDir)
     except FileExistsError:
         pass # directory exists.
     
-    parseDir = currentWorkingDirectory + "\\to_be_parsed"
+    unknownPicDir = currentWorkingDirectory + "\\unknown_face"
     try:
-        os.makedirs(parseDir)
+        os.makedirs(unknownPicDir)
     except FileExistsError:
         pass # directory exists.
     
-    outlierDir = currentWorkingDirectory + "\\outlier"
+    noFaceFoundDir = currentWorkingDirectory + "\\face_not_found"
     try:
-        os.makedirs(outlierDir)
+        os.makedirs(noFaceFoundDir)
+    except FileExistsError:
+        pass # directory exists.
+    
+    sortedDir = currentWorkingDirectory + "\\post_run_face_match"
+    try:
+        os.makedirs(sortedDir)
     except FileExistsError:
         pass # directory exists.
         
-    return knownDir, parseDir, outlierDir
+    return knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir
     
 def isFaceFound(imageFile):
     image = face_recognition.load_image_file(imageFile)
@@ -50,48 +53,56 @@ def isFaceFound(imageFile):
         return False
     return True
 
-def removeFaceless(parseDir, outlierDir):
+def removeFaceless(filename, unknownPicDir, noFaceFoundDir):
     '''
-    For every files in the parseDir:
-        check if face exists
+    Check if face is found on the chosen file. If face is not found, move it to directory called noFaceFoundDir.
     '''
-    for filename in os.listdir(parseDir):
-        if not isFaceFound(parseDir + "\\" + filename):
-            Path(parseDir+"\\"+filename).rename(outlierDir+"\\"+filename)
-            #os.rename(parseDir+"\\"+filename, outlierDir)
-            print("Move the file: "+ filename)
+    #Path(unknownPicDir+"\\"+filename).rename(noFaceFoundDir+"\\"+filename)
+    os.rename(unknownPicDir+"\\"+filename, noFaceFoundDir+"\\"+filename) # This gives error FileNotFoundError: [WinError 2] The system cannot find the file specified: '\\Untitled.jpg' -> '\\Untitled.jpg'
+    #print("Move the file: "+ filename)
 
-def findMatchingFace(knownDir, parseDir):
+def findMatchingFace(knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir):
     '''
-    For every picture in knownDir:
-        For every picture in parseDir:
-            if picture in parseDir have the same encoding as picture in knownDir:
-                Rename file to be the same as picture in knownDir+number
-                Goal:
-                make a directory by the name of th efile in knownDir if it has not been created
-                move the file to the new direcory
+    For every picture in knownPicDir:
+        For every picture in unknownPicDir:
+            If face not found:
+                remove picture to no face directory
+            If face found:
+                if picture in unknownPicDir have the same encoding as picture in knownPicDir:
+                    Rename file to be the same as picture in knownPicDir+number
+                    Goal:
+                    make a directory by the name of th efile in knownPicDir if it has not been created
+                    move the file to the new direcory
                 
                 
     Possible enhancement:
     1. Get multiple different pictures of a known person to be applied on 2nd run (after new directory is created).
     '''
-    for knownPic_filename in os.listdir(knownDir):
-        known_image = face_recognition.load_image_file(knownDir+"\\"+knownPic_filename)
+    for knownPic_filename in os.listdir(knownPicDir):
+        known_image = face_recognition.load_image_file(knownPicDir+"\\"+knownPic_filename)
         known_encoding = face_recognition.face_encodings(known_image)[0]
+        known_face_name = os.path.splitext(knownPic_filename)[0] # get File Name of the file.
         i = 0
-        for check_fileName in os.listdir(parseDir):
-            parsed_image = face_recognition.load_image_file(parseDir+"\\"+check_fileName)
-            parsed_encoding = face_recognition.face_encodings(parsed_image)[0]
-            oldExt = os.path.splitext(check_fileName)[1]
+        for check_fileName in os.listdir(unknownPicDir):
+            if not isFaceFound(unknownPicDir + "\\" + check_fileName):
+                removeFaceless(check_fileName, unknownPicDir, noFaceFoundDir)
+            else:
+                parsed_image = face_recognition.load_image_file(unknownPicDir+"\\"+check_fileName)
+                parsed_encoding = face_recognition.face_encodings(parsed_image)[0]
+                
+                result = face_recognition.compare_faces([known_encoding], parsed_encoding)[0]
+                if result:
+                    try:
+                        os.makedirs(sortedDir+"\\"+known_face_name)
+                    except FileExistsError:
+                        pass # directory exists.
+                    #print('Filename: {0} have the result: {1}.'.format(knownPic_filename, result)) # testing purposes.
+                    os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_name+"\\"+check_fileName)
+                    print("File moved to {0}".format(sortedDir+"\\"+known_face_name+"\\"+check_fileName))
+                    i += 1
             
-            result = face_recognition.compare_faces([known_encoding], parsed_encoding)[0]
-            if result:
-                #print('Filename: {0} have the result: {1}.'.format(knownPic_filename, result))
-                os.rename(parseDir+"\\"+check_fileName, parseDir+"\\"+knownPic_filename+"_"+str(i)+oldExt)
-                i += 1
-        
-            # Make directory if directory doesn't exist.
-            # Path(currentWorkingDirectory+"\\"+knownPic_filename).mkdir(parent=True, exist_ok=True)
+                # Make directory if directory doesn't exist.
+                # Path(currentWorkingDirectory+"\\"+knownPic_filename).mkdir(parent=True, exist_ok=True)
             
 if __name__ == "__main__":
     main()
