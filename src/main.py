@@ -6,21 +6,27 @@ from pathlib import Path
 
 '''Global Variables'''
 currentWorkingDirectory = os.getcwd()
+faceFilenameDict = {}
 
 def main():
     print("Running Face Recognition")
-    # knownPicDir = unknownPicDir = noFaceFoundDir = "" # unsure if this is required.
     knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir = initialise()
    
     # Find matching face
     findMatchingFace(knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir)
 
-    print("Finish running")
+    print("Finish running. Printing dict: {0}".format(faceFilenameDict))
     
 def initialise():
     '''
     Make directory if not found.
+    
+    Tested on Windows 10.
+    
+    Enhancement:
+    1. Ensure this is also working on Linux.
     '''
+    
     knownPicDir = currentWorkingDirectory + "\\known_face"
     try:
         os.makedirs(knownPicDir)
@@ -48,6 +54,15 @@ def initialise():
     return knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir
     
 def isFaceFound(imageFile):
+    '''
+    Check the imageFile if face is found by using face_location method.
+    
+    Param: imageFile = image file.
+    
+    Return:
+        True = Image found.
+        False = Image not found.
+    '''
     image = face_recognition.load_image_file(imageFile)
     face_locations = face_recognition.face_locations(image)
     if not face_locations:
@@ -58,7 +73,6 @@ def removeFaceless(filename, unknownPicDir, noFaceFoundDir):
     '''
     Check if face is found on the chosen file. If face is not found, move it to directory called noFaceFoundDir.
     '''
-    #Path(unknownPicDir+"\\"+filename).rename(noFaceFoundDir+"\\"+filename)
     os.rename(unknownPicDir+"\\"+filename, noFaceFoundDir+"\\"+filename)
     #print("Move the file: "+ filename)
 
@@ -81,29 +95,36 @@ def findMatchingFace(knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir):
     '''
     for knownPic_filename in os.listdir(knownPicDir):
         known_image = face_recognition.load_image_file(knownPicDir+"\\"+knownPic_filename)
-        known_encoding = face_recognition.face_encodings(known_image)[0]
-        known_face_name = os.path.splitext(knownPic_filename)[0] # get File Name of the file.
-        i = 0
+        known_encoding = face_recognition.face_encodings(known_image) # face_recognition.face_encodings(known_image)[0] # Initial test, this assumes there is only 1 face in a picture.
+        known_face_name = os.path.splitext(knownPic_filename)[0] # get File Name of the file of known face.
         for check_fileName in os.listdir(unknownPicDir):
+            #print("Current file check: {0}".format(check_fileName))
+            fileMovedFlag = False
             if not isFaceFound(unknownPicDir + "\\" + check_fileName):
                 removeFaceless(check_fileName, unknownPicDir, noFaceFoundDir)
             else:
                 parsed_image = face_recognition.load_image_file(unknownPicDir+"\\"+check_fileName)
-                parsed_encoding = face_recognition.face_encodings(parsed_image)[0]
+                parsed_encoding = face_recognition.face_encodings(parsed_image)
                 
-                result = face_recognition.compare_faces([known_encoding], parsed_encoding)[0]
-                if result:
-                    try:
-                        os.makedirs(sortedDir+"\\"+known_face_name)
-                    except FileExistsError:
-                        pass # directory exists.
-                    #print('Filename: {0} have the result: {1}.'.format(knownPic_filename, result)) # testing purposes.
-                    os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_name+"\\"+check_fileName)
-                    print("File moved to {0}".format(sortedDir+"\\"+known_face_name+"\\"+check_fileName))
-                    i += 1
-            
-                # Make directory if directory doesn't exist.
-                # Path(currentWorkingDirectory+"\\"+knownPic_filename).mkdir(parent=True, exist_ok=True)
-            
+                for i in parsed_encoding: # Parse through all possible encodings in unknwownPicDir
+                    result = face_recognition.compare_faces(known_encoding, i) # True if face matches.
+                    #print("Result: {0}.i:{1}.".format(result, i[0]))
+                    if True in result:
+                        try:
+                            os.makedirs(sortedDir+"\\"+known_face_name)
+                        except FileExistsError:
+                            pass # directory exists.
+                        #print('Filename: {0} have the result: {1}.'.format(knownPic_filename, result)) # testing purposes.
+                        os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_name+"\\"+check_fileName) # Move known face to their directory
+                        print("File moved to {0}".format(sortedDir+"\\"+known_face_name+"\\"+check_fileName))
+                        fileMovedFlag = True
+                        break
+                        
+                if not fileMovedFlag:
+                    for i in parsed_encoding:
+                        # require to use tuple, oherwise it'll give an error: TypeError: unhashable type: 'numpy.ndarray' 
+                        tuppleArr = tuple(i)
+                        faceFilenameDict[tuppleArr] = check_fileName
+
 if __name__ == "__main__":
     main()
