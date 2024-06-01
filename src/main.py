@@ -64,7 +64,7 @@ def removeFaceless(filename, unknownPicDir, noFaceFoundDir):
     os.rename(unknownPicDir+"\\"+filename, noFaceFoundDir+"\\"+filename)
     #print("Move the file: "+ filename)
 
-def findMatchingFace2(knownFaceDict, unknownFaceDict):
+def findMatchingFace(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir):
     '''
     face_recognition.compare_faces(List x, numpy.ndarray y)
     x is List of numpy.ndarray
@@ -76,12 +76,17 @@ def findMatchingFace2(knownFaceDict, unknownFaceDict):
     Currently, faceFilenameDict keys are tuples.
     So, change tuples to list.
     Then convert list to numpy.ndarray.
+    
+    Possible enhancement:
+    1. Recognition of face that is found but not known yet then add it to the known face.
     '''
     for i in knownFaceDict:
-        known_face_name = knownFaceDict[i] # Get file name of known face.
+        known_face_name = knownFaceDict[i] # Get file name of known face. This will include extension.
+        known_face_filename = os.path.splitext(known_face_name)[0] # extract just the filename withotu extension.
         knownList = []
         knownList.append(np.asarray(i)) # Assume there is only one face.
         for j in unknownFaceDict:
+            fileMovedFlag = False
             check_fileName = unknownFaceDict[j]
             myList = []
             myList.append(np.asarray(j))
@@ -93,13 +98,28 @@ def findMatchingFace2(knownFaceDict, unknownFaceDict):
                     except FileExistsError:
                         pass # directory exists.
                     #print('Filename: {0} have the result: {1}.'.format(knownPic_filename, result)) # testing purposes.
-                    #os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_name+"\\"+check_fileName) # Move known face to their directory
-                    print("File moved to {0}".format(sortedDir+"\\"+known_face_name+"\\"+check_fileName))          
+                    #os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_filename+"\\"+check_fileName) # Move known face to their directory
+                    print("File moved to {0}".format(sortedDir+"\\"+known_face_filename+"\\"+check_fileName))          
+                    fileMovedFlag = True
+                    break
+            if fileMovedFlag: # With assumption that there are pictures with multiple faces in it.
+                # Delete all dictionary entry that have the value as check_fileName
+                # use of dict comprehension
+                unknownFaceDict = {key:val for key, val in unknownFaceDict.items() if val != check_fileName}
 
 def encodeAllPics(checkDir, noFaceFoundDir):
+    '''
+    Param:
+    checkDir = Directory that is going to be checked.
+    noFaceFoundDir = Directory where no face found is going to be stored.
+
+    Return: dictionary
+    key: tuple of numpy.ndarray
+    value: name of file
+    '''
     returnDict = {}
     for check_fileName in os.listdir(checkDir):
-        print("Current file check: {0} \\ {1}.".format(checkDir, check_fileName))
+        # print("Current file check: {0} \\ {1}.".format(checkDir, check_fileName))
         if not isFaceFound(checkDir + "\\" + check_fileName):
             removeFaceless(check_fileName, checkDir, noFaceFoundDir)
         else:
@@ -114,16 +134,14 @@ def encodeAllPics(checkDir, noFaceFoundDir):
 def main():
     print("Running Face Recognition")
     knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir = initialise()
-   
-    # Find matching face
-    #findMatchingFace(knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir)
-    
-    unknownFaceDict = encodeAllPics(unknownPicDir, noFaceFoundDir)
-    knownFaceDict = encodeAllPics(knownPicDir, noFaceFoundDir)
-    
-    findMatchingFace2(knownFaceDict, unknownFaceDict)
 
-    #print("Finish running. Printing dict: {0}".format(faceFilenameDict))
+    knownFaceDict = encodeAllPics(knownPicDir, noFaceFoundDir)
+    unknownFaceDict = encodeAllPics(unknownPicDir, noFaceFoundDir)
+    
+    # Find matching face    
+    findMatchingFace(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir)
+
+    print("Finish running.")
 
 if __name__ == "__main__":
     main()
