@@ -167,6 +167,9 @@ def getKeyFromVal(dictionary, value):
     key = list(dictionary.keys())[list(dictionary.values()).index(value)]
     return key
     
+def getAllValues(dictionary):
+    return list(dictionary.values())
+    
 def loadFromFile(filename):
     import pickle
     dbfile = open(filename, 'rb')
