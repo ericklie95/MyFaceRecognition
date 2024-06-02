@@ -111,6 +111,32 @@ def findMatchingFace(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir):
                 unknownFaceDict = {key:val for key, val in unknownFaceDict.items() if val != check_fileName}
             '''
 
+def findMatchingFace2(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir):
+    for i in knownFaceDict:
+        known_face_name = knownFaceDict[i] # Get file name of known face. This will include extension.
+        known_face_filename = os.path.splitext(known_face_name)[0] # extract just the filename withotu extension.
+        knownList = []
+        knownList.append(np.asarray(i)) # Assume there is only one face.
+        for j in unknownFaceDict:
+            fileMovedFlag = False
+            check_fileName = unknownFaceDict[j]
+            h = np.asarray(j)
+            result = face_recognition.compare_faces(knownList, h)
+            if True in result:
+                try:
+                    os.makedirs(sortedDir+"\\"+known_face_filename)
+                except FileExistsError:
+                    pass # directory exists.
+                    
+                try:
+                    #print('Filename: {0} have the result: {1}.'.format(knownPic_filename, result)) # testing purposes.
+                    os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_filename+"\\"+check_fileName) # Move known face to their directory
+                    print("File moved to {0}".format(sortedDir+"\\"+known_face_filename+"\\"+check_fileName))          
+                except:
+                    print("Error: Possible that there are 2 faces on the filename: {0}.".format(check_fileName))
+            
+
+
 def encodeAllPics(checkDir, noFaceFoundDir):
     '''
     Param:
@@ -152,7 +178,7 @@ def main():
     unknownFaceDict = encodeAllPics(unknownPicDir, noFaceFoundDir)
     
     # Find matching face    
-    findMatchingFace(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir)
+    findMatchingFace2(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir)
 
     # Dump result to json
     convertToFile(knownFaceDict, "knownFaceDict.db") 
