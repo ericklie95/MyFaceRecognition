@@ -79,6 +79,7 @@ def findMatchingFace(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir):
     
     Possible enhancement:
     1. Recognition of face that is found but not known yet then add it to the known face.
+    2. Skip iterate over file that already loaded from json file.
     '''
     for i in knownFaceDict:
         known_face_name = knownFaceDict[i] # Get file name of known face. This will include extension.
@@ -94,18 +95,21 @@ def findMatchingFace(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir):
                 result = face_recognition.compare_faces(knownList, h)
                 if True in result:
                     try:
-                        os.makedirs(sortedDir+"\\"+known_face_name)
+                        os.makedirs(sortedDir+"\\"+known_face_filename)
                     except FileExistsError:
                         pass # directory exists.
                     #print('Filename: {0} have the result: {1}.'.format(knownPic_filename, result)) # testing purposes.
-                    #os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_filename+"\\"+check_fileName) # Move known face to their directory
+                    os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_filename+"\\"+check_fileName) # Move known face to their directory
                     print("File moved to {0}".format(sortedDir+"\\"+known_face_filename+"\\"+check_fileName))          
                     fileMovedFlag = True
                     break
+                    
+            '''
             if fileMovedFlag: # With assumption that there are pictures with multiple faces in it.
                 # Delete all dictionary entry that have the value as check_fileName
                 # use of dict comprehension
                 unknownFaceDict = {key:val for key, val in unknownFaceDict.items() if val != check_fileName}
+            '''
 
 def encodeAllPics(checkDir, noFaceFoundDir):
     '''
@@ -131,22 +135,41 @@ def encodeAllPics(checkDir, noFaceFoundDir):
                 returnDict[tuppleArr] = check_fileName
     return returnDict
 
+def convertToFile(dictionary, filename):
+    import pickle
+    
+    fp = open(filename, 'ab')
+    pickle.dump(dictionary, fp)
+    fp.close()
+    
 def main():
     print("Running Face Recognition")
     knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir = initialise()
 
+    # TODO: Read from file if available then add it to the dictionary of knownFaceDict if required.
+    
     knownFaceDict = encodeAllPics(knownPicDir, noFaceFoundDir)
     unknownFaceDict = encodeAllPics(unknownPicDir, noFaceFoundDir)
     
     # Find matching face    
     findMatchingFace(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir)
 
+    # Dump result to json
+    convertToFile(knownFaceDict, "knownFaceDict.db") 
+    convertToFile(unknownFaceDict, "unknownFaceDict.db")
+        
     print("Finish running.")
 
 if __name__ == "__main__":
     main()
     
-
 def getKeyFromVal(dictionary, value):
     key = list(dictionary.keys())[list(dictionary.values()).index(value)]
     return key
+    
+def loadFromFile(filename):
+    import pickle
+    dbfile = open(filename, 'rb')
+    returnDict = pickle.load(dbfile)
+    dbfile.close()
+    return returnDict
