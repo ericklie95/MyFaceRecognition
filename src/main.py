@@ -129,7 +129,7 @@ def findMatchingFace2(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir):
                     pass # directory exists.
                     
                 try:
-                    # TESTING
+                    #TESTING, the following is where the movement happens.
                     #os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_filename+"\\"+check_fileName) # Move known face to their directory
                     print("File moved to {0}".format(sortedDir+"\\"+known_face_filename+"\\"+check_fileName))          
                 except:
@@ -141,7 +141,7 @@ def getAllValues(dictionary):
     return list(dictionary.values())
  
 
-def encodeAllPics(checkDir, noFaceFoundDir, savedKnownFaceDict={}):
+def encodeAllPics(checkDir, noFaceFoundDir, savedDict={}, dbFile):
     '''
     Param:
     checkDir = Directory that is going to be checked.
@@ -154,9 +154,10 @@ def encodeAllPics(checkDir, noFaceFoundDir, savedKnownFaceDict={}):
     '''
     returnDict = {}
     knownFaceListName = []
-    if(savedKnownFaceDict):
-        returnDict = savedKnownFaceDict
-        knownFaceListName = getAllValues(savedKnownFaceDict)
+    counter = 0
+    if(savedDict):
+        returnDict = savedDict
+        knownFaceListName = getAllValues(savedDict)
     for check_fileName in os.listdir(checkDir):
         if(check_fileName in knownFaceListName):
             print("Found {0}, skip to the next file".format(check_fileName))
@@ -170,6 +171,10 @@ def encodeAllPics(checkDir, noFaceFoundDir, savedKnownFaceDict={}):
             for i in parsed_encoding:
                 tuppleArr = tuple(i) # Convert numpy.ndarray to tuple for hash key.
                 returnDict[tuppleArr] = check_fileName
+            counter += 1
+        if(counter == 10):
+            counter = 0
+            convertToFile(returnDict, dbFile) 
     return returnDict
 
 def convertToFile(dictionary, filename):
@@ -197,19 +202,21 @@ def main():
     knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir = initialise()
 
     filenameForKnownFace = os.getcwd() + "\\" + "knownFaceDict.db"
+    filenameForUnknownFace = os.getcwd() + "\\" + "unknownFaceDict.db"
     
-    # TODO: Read from file if available then add it to the dictionary of knownFaceDict if required.
+    # Assumption: If filename is the same, we assume the encoding has already been completed.
     savedKnownFaceDict = loadFromFile(filenameForKnownFace)
+    savedUnknownFaceDict = loadFromFile(filenameForUnknownFace)
     
-    knownFaceDict = encodeAllPics(knownPicDir, noFaceFoundDir, savedKnownFaceDict)
-    unknownFaceDict = encodeAllPics(unknownPicDir, noFaceFoundDir)
+    knownFaceDict = encodeAllPics(knownPicDir, noFaceFoundDir, savedKnownFaceDict, filenameForKnownFace)
+    unknownFaceDict = encodeAllPics(unknownPicDir, noFaceFoundDir, savedUnknownFaceDict, filenameForUnknownFace)
     
     # Find matching face    
     findMatchingFace2(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir)
 
-    # Dump result to json
+    # Dump results to a file.
     convertToFile(knownFaceDict, filenameForKnownFace) 
-    convertToFile(unknownFaceDict, "unknownFaceDict.db")
+    convertToFile(unknownFaceDict, filenameForUnknownFace)
         
     print("Finish running.")
 
