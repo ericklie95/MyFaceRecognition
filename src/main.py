@@ -129,26 +129,38 @@ def findMatchingFace2(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir):
                     pass # directory exists.
                     
                 try:
-                    #print('Filename: {0} have the result: {1}.'.format(knownPic_filename, result)) # testing purposes.
-                    os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_filename+"\\"+check_fileName) # Move known face to their directory
+                    # TESTING
+                    #os.rename(unknownPicDir+"\\"+check_fileName, sortedDir+"\\"+known_face_filename+"\\"+check_fileName) # Move known face to their directory
                     print("File moved to {0}".format(sortedDir+"\\"+known_face_filename+"\\"+check_fileName))          
                 except:
+                    # Could go here if the file has been moved and the file has 2 faces?
                     print("Error: Possible that there are 2 faces on the filename: {0}.".format(check_fileName))
             
 
+def getAllValues(dictionary):
+    return list(dictionary.values())
+ 
 
-def encodeAllPics(checkDir, noFaceFoundDir):
+def encodeAllPics(checkDir, noFaceFoundDir, savedKnownFaceDict={}):
     '''
     Param:
     checkDir = Directory that is going to be checked.
     noFaceFoundDir = Directory where no face found is going to be stored.
+    knownFaceListName = List of filename from saved file.
 
     Return: dictionary
     key: tuple of numpy.ndarray
     value: name of file
     '''
     returnDict = {}
+    knownFaceListName = []
+    if(savedKnownFaceDict):
+        returnDict = savedKnownFaceDict
+        knownFaceListName = getAllValues(savedKnownFaceDict)
     for check_fileName in os.listdir(checkDir):
+        if(check_fileName in knownFaceListName):
+            print("Found {0}, skip to the next file".format(check_fileName))
+            continue
         # print("Current file check: {0} \\ {1}.".format(checkDir, check_fileName))
         if not isFaceFound(checkDir + "\\" + check_fileName):
             removeFaceless(check_fileName, checkDir, noFaceFoundDir)
@@ -156,32 +168,47 @@ def encodeAllPics(checkDir, noFaceFoundDir):
             parsed_image = face_recognition.load_image_file(checkDir+"\\"+check_fileName)
             parsed_encoding = face_recognition.face_encodings(parsed_image)    
             for i in parsed_encoding:
-                # require to use tuple, oherwise it'll give an error: TypeError: unhashable type: 'numpy.ndarray' 
-                tuppleArr = tuple(i)
+                tuppleArr = tuple(i) # Convert numpy.ndarray to tuple for hash key.
                 returnDict[tuppleArr] = check_fileName
     return returnDict
 
 def convertToFile(dictionary, filename):
     import pickle
     
-    fp = open(filename, 'ab')
+    fp = open(filename, 'wb')
     pickle.dump(dictionary, fp)
     fp.close()
+ 
+def loadFromFile(filename):
+    import pickle
     
+    try:
+        dbfile = open(filename, 'rb')
+        returnDict = pickle.load(dbfile)
+        dbfile.close()
+        return returnDict
+    except:
+        return "File:{0} not found! Exitting...".format(filename)
+        raise SystemExit
+ 
+
 def main():
     print("Running Face Recognition")
     knownPicDir, unknownPicDir, noFaceFoundDir, sortedDir = initialise()
 
-    # TODO: Read from file if available then add it to the dictionary of knownFaceDict if required.
+    filenameForKnownFace = os.getcwd() + "\\" + "knownFaceDict.db"
     
-    knownFaceDict = encodeAllPics(knownPicDir, noFaceFoundDir)
+    # TODO: Read from file if available then add it to the dictionary of knownFaceDict if required.
+    savedKnownFaceDict = loadFromFile(filenameForKnownFace)
+    
+    knownFaceDict = encodeAllPics(knownPicDir, noFaceFoundDir, savedKnownFaceDict)
     unknownFaceDict = encodeAllPics(unknownPicDir, noFaceFoundDir)
     
     # Find matching face    
     findMatchingFace2(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir)
 
     # Dump result to json
-    convertToFile(knownFaceDict, "knownFaceDict.db") 
+    convertToFile(knownFaceDict, filenameForKnownFace) 
     convertToFile(unknownFaceDict, "unknownFaceDict.db")
         
     print("Finish running.")
@@ -193,12 +220,5 @@ def getKeyFromVal(dictionary, value):
     key = list(dictionary.keys())[list(dictionary.values()).index(value)]
     return key
     
-def getAllValues(dictionary):
-    return list(dictionary.values())
+
     
-def loadFromFile(filename):
-    import pickle
-    dbfile = open(filename, 'rb')
-    returnDict = pickle.load(dbfile)
-    dbfile.close()
-    return returnDict
