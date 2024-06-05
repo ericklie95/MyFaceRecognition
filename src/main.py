@@ -140,6 +140,13 @@ def findMatchingFace2(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir):
 def getAllValues(dictionary):
     return list(dictionary.values())
  
+def convertToFile(dictionary, filename):
+    import pickle
+    
+    fp = open(filename, 'wb')
+    pickle.dump(dictionary, fp)
+    fp.close()
+ 
 
 def encodeAllPics(checkDir, noFaceFoundDir, savedDict={}, dbFile):
     '''
@@ -177,13 +184,7 @@ def encodeAllPics(checkDir, noFaceFoundDir, savedDict={}, dbFile):
             convertToFile(returnDict, dbFile) 
     return returnDict
 
-def convertToFile(dictionary, filename):
-    import pickle
-    
-    fp = open(filename, 'wb')
-    pickle.dump(dictionary, fp)
-    fp.close()
- 
+
 def loadFromFile(filename):
     import pickle
     
@@ -206,17 +207,22 @@ def main():
     
     # Assumption: If filename is the same, we assume the encoding has already been completed.
     savedKnownFaceDict = loadFromFile(filenameForKnownFace)
+    if(not savedKnownFaceDict):
+        savedKnownFaceDict = {}
     savedUnknownFaceDict = loadFromFile(filenameForUnknownFace)
+    if(not savedUnknownFaceDict):
+        savedUnknownFaceDict = {}
     
+    # Encode all known pictures and store it to a file.
     knownFaceDict = encodeAllPics(knownPicDir, noFaceFoundDir, savedKnownFaceDict, filenameForKnownFace)
-    unknownFaceDict = encodeAllPics(unknownPicDir, noFaceFoundDir, savedUnknownFaceDict, filenameForUnknownFace)
-    
-    # Find matching face    
-    findMatchingFace2(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir)
-
-    # Dump results to a file.
     convertToFile(knownFaceDict, filenameForKnownFace) 
+
+    # Encode all unknown pictures and store it to a file.
+    unknownFaceDict = encodeAllPics(unknownPicDir, noFaceFoundDir, savedUnknownFaceDict, filenameForUnknownFace)
     convertToFile(unknownFaceDict, filenameForUnknownFace)
+    
+    # Find matching face based on the 2 encodings that we have done.
+    findMatchingFace2(knownFaceDict, unknownFaceDict, sortedDir, unknownPicDir)    
         
     print("Finish running.")
 
